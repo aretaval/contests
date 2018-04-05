@@ -1,0 +1,110 @@
+#include <iostream>
+#include <vector>
+#include <cmath>
+#include <algorithm>
+#include <iomanip>
+
+struct Point {
+    size_t id;
+    long long x;
+    long long y;
+};
+
+bool compareByX(const Point& p1, const Point& p2) {
+    return p1.x != p2.x ? p1.x < p2.x : p1.y < p2.y;
+}
+
+bool compareByY(const Point& p1, const Point& p2) {
+    return p1.y < p2.y;
+}
+
+long long distanceSqr(const Point& p1, const Point& p2) {
+    return (p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y);
+}
+
+void printPoints(const std::vector<Point>& vec) {
+    for (size_t i = 0; i != vec.size(); ++i) {
+        std::cout << vec[i].id << " " << vec[i].x << " " << vec[i].y << "\n";
+    }
+}
+
+long long minDistSqr = -1;
+size_t resultP1 = 0, resultP2 = 0;
+
+void updateResult(const Point& p1, const Point& p2) {
+    long long dist = distanceSqr(p1, p2);
+    if (dist < minDistSqr) {
+        minDistSqr = dist;
+        resultP1 = p1.id;
+        resultP2 = p1.id;
+    }
+}
+
+void findMinDistBase(std::vector<Point>::iterator first, std::vector<Point>::iterator last) {
+    for (auto it1 = first; it1 != last; ++it1) {
+        for (auto it2 = it1 + 1; it2 != last; ++it2) {
+            updateResult(*it1, *it2);
+        }
+    }
+}
+
+void findMinDist(std::vector<Point>::iterator first, std::vector<Point>::iterator last) {
+    if (last - first <= 3) {
+        findMinDistBase(first, last);
+        std::sort(first, last, compareByY);
+        return;
+    }
+
+    auto middle = first + (last - first) / 2;
+    long long midX = (*middle).x;
+
+    findMinDist(first, middle);
+    findMinDist(middle, last);
+
+    std::vector<Point> buffer(static_cast<unsigned long>(last - first));
+    std::merge(first, middle, middle, last, buffer.begin(), compareByY);
+    std::copy(buffer.begin(), buffer.end(), first);
+    buffer.clear();
+    buffer.shrink_to_fit();
+
+    std::vector<Point> selectedPoints;
+    for (auto it = first; it != last; ++it) {
+        if (((*it).x - midX) * ((*it).x - midX) < minDistSqr) {
+            size_t size = selectedPoints.size();
+            for (size_t i = 0;
+                 i != selectedPoints.size() &&
+                         ((*it).y - selectedPoints[size - i - 1].y) *
+                                 ((*it).y - selectedPoints[size - i - 1].y) < minDistSqr;
+                 ++i) {
+                updateResult(*it, selectedPoints[size - i - 1]);
+            }
+            selectedPoints.push_back(*it);
+        }
+    }
+    selectedPoints.clear();
+    selectedPoints.shrink_to_fit();
+}
+
+int main() {
+    size_t pointsCount;
+    std::cin >> pointsCount;
+
+    std::vector<Point> points(pointsCount);
+    for (size_t i = 0; i != pointsCount; ++i) {
+        points[i].id = i;
+        std::cin >> points[i].x;
+        std::cin >> points[i].y;
+    }
+
+    std::sort(points.begin(), points.end(), compareByX);
+
+    minDistSqr = distanceSqr(points[0], points[1]);
+    resultP1 = points[0].id;
+    resultP2 = points[1].id;
+
+    findMinDist(points.begin(), points.end());
+
+    std::cout <<
+              std::setprecision(std::numeric_limits<long double>::digits10 + 1) <<
+              std::sqrt(minDistSqr) << "\n";
+}

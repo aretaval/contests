@@ -1,0 +1,250 @@
+#include <iostream>
+
+template <typename T>
+class List {
+    struct ListElementBase {
+        ListElementBase* next;
+        ListElementBase* prev;
+
+        ListElementBase(): next{this}, prev{this} {}
+    };
+
+    struct ListElement: public ListElementBase {
+        T data;
+
+        explicit ListElement(const T& value): data{value} {}
+
+        explicit ListElement(T&& value): data{std::move(value)} {}
+
+        ~ListElement() {}
+    };
+
+public:
+    class Iterator {
+    public:
+        friend class List;
+
+        Iterator();
+        explicit Iterator(ListElementBase* list_element_ptr);
+        Iterator& operator++();
+        Iterator operator++(int);
+        Iterator& operator--();
+        T& operator*() const;
+        T* operator->() const;
+
+        bool operator==(const Iterator& other);
+        bool operator!=(const Iterator& other);
+
+    private:
+        ListElementBase* list_element_ptr_;
+    };
+
+    List();
+    List(const List& other);
+    List(List&& other);
+    ~List();
+
+    List& operator=(const List& other);
+    List& operator=(List&& other);
+
+    Iterator begin();
+    Iterator end();
+    Iterator begin() const;
+    Iterator end() const;
+
+    bool empty() const;
+    size_t size() const;
+
+    void insert(Iterator pos, const T& value);
+    void insert(Iterator pos, T&& value);
+    void insert(Iterator pos, Iterator first, Iterator last);
+    void erase(Iterator pos);
+    void erase(Iterator first, Iterator last);
+    void push_back(const T& value);
+    void push_back(T&& value);
+    void push_front(const T& value);
+    void push_front(T&& value);
+    void pop_back();
+    void pop_front();
+
+private:
+    ListElementBase* end_;
+    size_t size_ = 0;
+};
+
+// List::Iterator
+template <typename T>
+List<T>::Iterator::Iterator(): list_element_ptr_(nullptr) {}
+
+template <typename T>
+List<T>::Iterator::Iterator(List::ListElementBase *list_element_ptr):
+        list_element_ptr_(list_element_ptr) {}
+
+template <typename T>
+typename List<T>::Iterator& List<T>::Iterator::operator++() {
+    list_element_ptr_ = list_element_ptr_->next;
+
+    return *this;
+}
+
+template <typename T>
+typename List<T>::Iterator List<T>::Iterator::operator++(int) {
+    Iterator result(*this);
+    ++(*this);
+
+    return result;
+}
+
+template <typename T>
+typename List<T>::Iterator &List<T>::Iterator::operator--() {
+    list_element_ptr_ = list_element_ptr_->prev;
+
+    return *this;
+}
+
+template <typename T>
+T& List<T>::Iterator::operator*() const {
+    return (reinterpret_cast<ListElement*>(list_element_ptr_))->data;
+}
+
+template <typename T>
+bool List<T>::Iterator::operator==(const Iterator& other) {
+    return list_element_ptr_ == other.list_element_ptr_;
+}
+
+template <typename T>
+bool List<T>::Iterator::operator!=(const Iterator& other) {
+    return !(*this == other);
+}
+
+// List
+template <typename T>
+List<T>::List(): end_(new ListElementBase), size_{0} {}
+
+template <typename T>
+List<T>::List(const List& other): end_(new ListElementBase), size_{0} {
+    insert(begin(), other.begin(), other.end());
+}
+
+template <typename T>
+List<T>::~List() {
+    erase(begin(), end());
+    delete end_;
+}
+
+template <typename T>
+List<T>& List<T>::operator=(const List& other) {
+    erase(begin(), end());
+    insert(begin(), other.begin(), other.end());
+    return *this;
+}
+
+template <typename T>
+bool List<T>::empty() const {
+    return size_ == 0;
+}
+
+template <typename T>
+size_t List<T>::size() const {
+    return size_;
+}
+
+template <typename T>
+void List<T>::insert(Iterator pos, const T& value) {
+    ListElement* new_element = new ListElement{value};
+
+    new_element->prev = pos.list_element_ptr_->prev;
+    new_element->next = pos.list_element_ptr_;
+
+    pos.list_element_ptr_->prev->next = new_element;
+    pos.list_element_ptr_->prev = new_element;
+
+    ++size_;
+}
+
+template <typename T>
+void List<T>::insert(Iterator pos, T&& value) {
+    auto * new_element = new ListElement{std::move(value)};
+
+    new_element->prev = pos.list_element_ptr_->prev;
+    new_element->next = pos.list_element_ptr_;
+
+    pos.list_element_ptr_->prev->next = new_element;
+    pos.list_element_ptr_->prev = new_element;
+
+    ++size_;
+}
+
+template <typename T>
+void List<T>::insert(Iterator pos, Iterator first, Iterator last) {
+    for (auto it = first; it != last; ++it) {
+        insert(pos, *it);
+    }
+}
+
+template <typename T>
+void List<T>::push_back(const T& value) {
+//    std::cout << "push_back(const T& value)\n";
+    insert(end(), value);
+}
+
+template <typename T>
+void List<T>::push_back(T&& value) {
+//    std::cout << "push_back(T&& value)\n";
+    insert(end(), std::move(value));
+}
+
+template <typename T>
+void List<T>::push_front(const T& value) {
+    insert(begin(), value);
+}
+
+template <typename T>
+void List<T>::push_front(T&& value) {
+    insert(begin(), std::move(value));
+}
+
+template <typename T>
+void List<T>::erase(Iterator pos) {
+    pos.list_element_ptr_->prev->next = pos.list_element_ptr_->next;
+    pos.list_element_ptr_->next->prev = pos.list_element_ptr_->prev;
+    delete reinterpret_cast<ListElement*>(pos.list_element_ptr_);
+    --size_;
+}
+
+template <typename T>
+void List<T>::pop_back() {
+    erase(--end());
+}
+
+template <typename T>
+void List<T>::pop_front() {
+    erase(begin());
+}
+
+template <typename T>
+void List<T>::erase(Iterator first, Iterator last) {
+    while (first != last) {
+        erase(first++);
+    }
+}
+
+template <typename T>
+typename List<T>::Iterator List<T>::begin() const {
+    return Iterator(end_->next);
+}
+
+template <typename T>
+typename List<T>::Iterator List<T>::end() const {
+    return Iterator(end_);
+}
+
+template <typename T>
+typename List<T>::Iterator List<T>::begin() {
+    return Iterator(end_->next);
+}
+
+template <typename T>
+typename List<T>::Iterator List<T>::end() {
+    return Iterator(end_);
+}
